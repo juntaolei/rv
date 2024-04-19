@@ -1,8 +1,15 @@
 package rv
 
+import rv.Debug.NoDebug
+
 trait FsmError extends Throwable
 
-case class FsmNoInitialStateError() extends FsmError
+case class FsmNoInitialStateError(string: String) extends FsmError
+
+enum Debug:
+    case NoDebug
+    case Warn
+    case Strict
 
 class FsmMonitor[Event]:
     thisMonitor =>
@@ -58,10 +65,9 @@ class FsmMonitor[Event]:
 
     case object Error extends Fsm
 
-    // TODO: Private this variable later. Currently, expose for use with invariant
-    var states: Set[Fsm] = Set()
-
-    private var invariant: List[(String, Unit => Boolean)] = List()
+    var debug: Debug = NoDebug
+    private var states: Set[Fsm] = Set()
+    private var properties: List[(String, Unit => Boolean)] = List()
 
     def step(t: Transition): Fsm =
         val newFsm = new Fsm {
@@ -82,13 +88,13 @@ class FsmMonitor[Event]:
 
 
     /**
-     * Add and check if an invariant holds when .
+     * Add and check if an property holds when .
      *
      * @param name      Invariant name
-     * @param predicate Lambda predicate for this invariant
+     * @param predicate Lambda predicate for this property
      */
-    def invariant(name: String)(predicate: => Boolean): Unit =
-        invariant ::= (name, _ => predicate)
+    def property(name: String)(predicate: => Boolean): Unit =
+        properties ::= (name, _ => predicate)
         check(name, predicate)
 
     def verify(event: Event): FsmMonitor[Event] =
@@ -99,15 +105,20 @@ class FsmMonitor[Event]:
                     newState
                 case None => state
         )
-        // Check if invariant holds.
-        invariant.foreach((name, predicate) => check(s"$event: $name", predicate(())))
+        // Check if property holds.
+        properties.foreach((name, predicate) => check(s"$event: $name", predicate(())))
         // Reset all machines at final good states.
         states = states.foldLeft(Set())((acc, state) =>
             state match
                 case Ok =>
                     state.initialState match
                         case Some(initialState) => acc + initialState
-                        case None => acc
+                        case None =>
+                            debug match
+                                case Debug.NoDebug =>
+                                case Debug.Warn =>
+                                case Debug.Strict => throw FsmNoInitialStateError(s"No initial state for $state")
+                            acc
                 case state => acc + state
         )
         thisMonitor

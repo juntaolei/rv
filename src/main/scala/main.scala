@@ -10,11 +10,11 @@ class SLMonitor extends FsmMonitor[Event]:
     private var doubleAcquire: Boolean = false
     private var threadSet: Set[Long] = Set()
 
-    invariant("Thread holding lock must immediately release when another thread tries to acquire") {
+    property("Thread holding lock must immediately release when another thread tries to acquire") {
         !doubleAcquire
     }
 
-    invariant("At most two threads can be associated with this lock") {
+    property("At most two threads can be associated with this lock") {
         threadSet.size <= 2
     }
 
