@@ -116,6 +116,15 @@ class DeferredIntMonitor extends FsmMonitor[Event] {
 }
 
 object Main extends IOApp.Simple {
+    private def traceSlice() =
+        val trace = List(
+            TraceableEvent(Event(1, "e"), Some(Seq(Parameter(1, "a", "a")))),
+            TraceableEvent(Event(2, "e"), Some(Seq(Parameter(2, "a", "a")))),
+            TraceableEvent(Event(3, "e"), Some(Seq(Parameter(1, "b", "b")))),
+            TraceableEvent(Event(4, "e"), Some(Seq(Parameter(2, "a", "a"), Parameter(1, "b", "b")))))
+        val res = new TraceSlice().process(trace)
+        res.map(println)
+
     private def deadlock() =
         FiberCompiler(sampleDeferredDeadlock) match
             case Left(value) => throw new RuntimeException(value.toString)
@@ -185,7 +194,11 @@ object Main extends IOApp.Simple {
         } yield ()
 
     val run: IO[Unit] =
+        println("Example trace slicing")
+        traceSlice()
+        println("Example deadlock detection monitor from log")
         deadlock()
+        println("Example checking of Deferred properties")
         property1()
             .flatMap(_ => property2())
             .flatMap(_ => property3())
