@@ -1,7 +1,5 @@
 package rv
 
-import rv.Debug.NoDebug
-
 trait FsmError extends Throwable
 
 case class FsmNoInitialStateError(string: String) extends FsmError
@@ -23,13 +21,6 @@ class FsmMonitor[Event]:
 
         private var transition: Option[Transition] = None
 
-        /**
-         * Define a step function for a finite state machine.
-         * Note it only steps once.
-         *
-         * @param t PartialFunction[Event, Fsm]
-         * @return this Fsm or new Fsm
-         */
         def step(t: Transition): Fsm =
             transition match
                 case Some(t) =>
@@ -49,6 +40,26 @@ class FsmMonitor[Event]:
                     transition = Some(t andThen (_ => thisFsm)) // Makes self looping transitions
                     thisFsm
 
+        def next(t: Transition): Fsm =
+            transition match
+                case Some(t) => new Fsm {
+                    this.next(t)
+                }
+                case None =>
+                    transition = Some(t orElse (_ => thisFsm)) // Makes self looping transitions
+                    thisFsm
+
+        def until(t: Transition): Fsm = new Fsm {
+            override def step(t1: Transition): Fsm =
+                transition match
+                    case Some(t) => new Fsm {
+                        thisMonitor.until(t).step(t1)
+                    }
+                    case None =>
+                        transition = Some(t orElse (t1 andThen (_ => thisFsm)))
+                        thisFsm
+        }
+
         inline def apply(event: Event): Option[Fsm] =
             initialState match
                 case Some(_) =>
@@ -65,7 +76,7 @@ class FsmMonitor[Event]:
 
     case object Error extends Fsm
 
-    var debug: Debug = NoDebug
+    var debug: Debug = Debug.NoDebug
     private var states: Set[Fsm] = Set()
     private var properties: List[(String, Unit => Boolean)] = List()
 
@@ -83,8 +94,26 @@ class FsmMonitor[Event]:
         states += newFsm
         newFsm
 
+    def next(t: Transition): Fsm =
+        val newFsm = new Fsm {
+            this.next(t)
+        }
+        states += newFsm
+        newFsm
+
+    def until(t: Transition): Fsm =
+        val newFsm = new Fsm {
+            this.until(t)
+        }
+        states += newFsm
+        newFsm
+
     private def check(name: String, inv: Boolean): Unit =
-        if !inv then println(s"[Violated] $name")
+        debug match
+            case Debug.NoDebug =>
+                if !inv then println(s"[Violated] $name")
+            case _ =>
+                println(s"Checking $name: [${if inv then "PASSED" else "FAILED"}]")
 
 
     /**

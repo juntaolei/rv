@@ -1,8 +1,5 @@
 package rv
 
-import rv.FiberLexer.{parse, phrase, rep1}
-import rv.FiberParser.{accept, phrase, rep1}
-
 import scala.language.postfixOps
 import scala.util.matching.Regex
 import scala.util.parsing.combinator.{Parsers, RegexParsers}
@@ -64,7 +61,7 @@ object FiberLexer extends RegexParsers:
         "WAITING|RUNNING|YIELDING".r ^^ { str => THREAD_STATUS(str) }
 
     private def functionCall: FiberLexer.Parser[FUNCTION_CALL] =
-        "\\s*[a-zA-Z0-9]+(?=\\s)".r ^^ { str => FUNCTION_CALL(str) }
+        "\\s*[a-zA-Z0-9$]+(?=\\s)".r ^^ { str => FUNCTION_CALL(str) }
 
     private def functionCallContext: FiberLexer.Parser[FUNCTION_CALL_CONTEXT] =
         "\\S+".r ^^ { str => FUNCTION_CALL_CONTEXT(str) }
@@ -133,12 +130,12 @@ object FiberParser extends Parsers:
     inline def apply(tokens: Seq[FiberToken]): Either[FiberCompilationError, FiberAST] =
         val reader = new FiberTokenReader(tokens)
 
-        trace(reader) match {
+        trace(reader) match
             case NoSuccess(msg, _) => Left(FiberParserError(msg))
             case Failure(msg, _) => Left(FiberParserError(msg))
             case Error(msg, _) => Left(FiberParserError(msg))
             case Success(result, _) => Right(result)
-        }
+
 
 object FiberCompiler:
     inline def apply(trace: String): Either[FiberCompilationError, List[FiberEvent]] =
